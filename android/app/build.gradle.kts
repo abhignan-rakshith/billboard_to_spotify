@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.example.billboard_to_spotify"
+    namespace = "com.abhignan.billboard_to_spotify"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
