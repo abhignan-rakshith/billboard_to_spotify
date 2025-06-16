@@ -1,9 +1,11 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -39,6 +41,154 @@ class _LoginScreenState extends State<LoginScreen> {
   String _status = '';
   bool _isLoading = false;
   String? _codeVerifier;
+  String? _accessToken;
+  Map<String, dynamic>? _userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupDeepLinkListener();
+  }
+
+  void _setupDeepLinkListener() {
+    // Listen for incoming deep links
+    const platform = MethodChannel('flutter/deeplink');
+    platform.setMethodCallHandler(_handleDeepLink);
+  }
+
+  Future<dynamic> _handleDeepLink(MethodCall call) async {
+    if (call.method == 'incoming_link') {
+      final String? link = call.arguments;
+      if (link != null && link.startsWith(REDIRECT_URI)) {
+        await _processSpotifyCallback(link);
+      }
+    }
+  }
+
+  Future<void> _processSpotifyCallback(String callbackUrl) async {
+    try {
+      final uri = Uri.parse(callbackUrl);
+      final code = uri.queryParameters['code'];
+      final error = uri.queryParameters['error'];
+
+      if (error != null) {
+        setState(() {
+          _status =
+              '❌ Authentication Failed!\n\nUser denied permission or cancelled login.\nPlease try again to use Spotify features.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (code != null && _codeVerifier != null) {
+        setState(() {
+          _status = 'Exchanging code for access token...';
+        });
+
+        await _exchangeCodeForToken(code);
+      } else {
+        setState(() {
+          _status = '❌ Error: No authorization code received';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _status = '❌ Error processing callback: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _exchangeCodeForToken(String code) async {
+    try {
+      print('Exchanging code for token...');
+      print('Code: ${code.substring(0, 20)}...');
+      print('Code verifier: ${_codeVerifier?.substring(0, 20)}...');
+
+      final response = await http.post(
+        Uri.parse('https://accounts.spotify.com/api/token'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'grant_type': 'authorization_code',
+          'code': code,
+          'redirect_uri': REDIRECT_URI,
+          'client_id': CLIENT_ID,
+          'code_verifier': _codeVerifier!,
+        },
+      );
+
+      print('Token response status: ${response.statusCode}');
+      print('Token response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _accessToken = data['access_token'];
+
+        print('Access token received: ${_accessToken?.substring(0, 20)}...');
+
+        setState(() {
+          _status = 'Getting user profile...';
+        });
+
+        await _getUserProfile();
+      } else {
+        final error = json.decode(response.body);
+        setState(() {
+          _status =
+              '❌ Token exchange failed: ${error['error_description'] ?? error['error']}\n\nFull error: $error';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Token exchange error: $e');
+      setState(() {
+        _status = '❌ Error exchanging token: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _getUserProfile() async {
+    try {
+      print(
+        'Getting user profile with token: ${_accessToken?.substring(0, 20)}...',
+      );
+
+      final response = await http.get(
+        Uri.parse('https://api.spotify.com/v1/me'),
+        headers: {
+          'Authorization': 'Bearer $_accessToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('Profile response status: ${response.statusCode}');
+      print('Profile response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        _userProfile = json.decode(response.body);
+        setState(() {
+          _status =
+              '✅ Login Successful!\n\nWelcome, ${_userProfile!['display_name'] ?? 'Spotify User'}!';
+          _isLoading = false;
+        });
+      } else {
+        final errorBody = response.body;
+        setState(() {
+          _status =
+              '❌ Failed to get user profile\n\nStatus: ${response.statusCode}\nError: $errorBody';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Profile error: $e');
+      setState(() {
+        _status = '❌ Error getting profile: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _loginToSpotify() async {
     setState(() {
@@ -64,19 +214,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (launched) {
         setState(() {
-          _status = 'Please complete login in browser and return to app';
-        });
-
-        // Note: In a real app, you'd handle the callback through deep links
-        // For now, we'll just show success when the browser opens
-        await Future.delayed(const Duration(seconds: 2));
-        setState(() {
           _status =
-              '✅ Spotify login URL opened successfully!\n\nNext: Handle the callback when user returns';
+              'Please complete login in browser...\n\nYou will be redirected back to the app automatically.';
         });
       } else {
         setState(() {
           _status = '❌ Failed to open Spotify login';
+          _isLoading = false;
         });
       }
     } catch (e) {
@@ -84,9 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _status = '❌ Error: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // Don't set _isLoading = false here, let the callback handle it
     }
   }
 
@@ -141,38 +283,96 @@ class _LoginScreenState extends State<LoginScreen> {
               const Icon(Icons.music_note, size: 80, color: Colors.green),
               const SizedBox(height: 40),
 
-              // Login Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _loginToSpotify,
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.login, color: Colors.white),
-                  label: Text(
-                    _isLoading ? 'Opening Spotify...' : 'Login to Spotify',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+              // Login/Success Buttons
+              if (_accessToken == null)
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _loginToSpotify,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.login, color: Colors.white),
+                    label: Text(
+                      _isLoading ? 'Opening Spotify...' : 'Login to Spotify',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1DB954), // Spotify Green
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1DB954), // Spotify Green
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+                )
+              else ...[
+                // Success buttons when logged in
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // TODO: Navigate to Billboard conversion
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🎵 Billboard conversion coming soon!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.playlist_add, color: Colors.white),
+                    label: const Text(
+                      'Create Billboard Playlist',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _accessToken = null;
+                        _userProfile = null;
+                        _codeVerifier = null;
+                        _isLoading = false;
+                        _status = 'Logged out successfully';
+                      });
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Logout'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 40),
 
@@ -211,7 +411,80 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-              const SizedBox(height: 20),
+              // User Profile Card (if logged in)
+              if (_userProfile != null) ...[
+                const SizedBox(height: 20),
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        // Profile Image
+                        if (_userProfile!['images'] != null &&
+                            _userProfile!['images'].isNotEmpty)
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundImage: NetworkImage(
+                              _userProfile!['images'][0]['url'],
+                            ),
+                          )
+                        else
+                          const CircleAvatar(
+                            radius: 40,
+                            backgroundColor: Colors.green,
+                            child: Icon(
+                              Icons.person,
+                              size: 40,
+                              color: Colors.white,
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+
+                        // User Info
+                        Text(
+                          _userProfile!['display_name'] ?? 'Spotify User',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (_userProfile!['email'] != null)
+                          Text(
+                            _userProfile!['email'],
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people,
+                              size: 16,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${_userProfile!['followers']?['total'] ?? 0} followers',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
 
               // Debug Info
               if (_codeVerifier != null)
