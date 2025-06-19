@@ -1,12 +1,25 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
+import 'local_server_service.dart';
 
 class SpotifyAuthService {
   static String? _codeVerifier;
+  static String? _currentRedirectUri;
+
+  // Platform-aware redirect URI
+  static String get redirectUri {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return AppConstants.spotifyRedirectUriMobile;
+    } else {
+      // For desktop, this will be set dynamically when server starts
+      return _currentRedirectUri ?? AppConstants.spotifyRedirectUriDesktop;
+    }
+  }
 
   // Generate PKCE Code Verifier
   static String _generateRandomString(int length) {
@@ -32,7 +45,7 @@ class SpotifyAuthService {
       'scope': AppConstants.spotifyScopes,
       'code_challenge_method': 'S256',
       'code_challenge': codeChallenge,
-      'redirect_uri': AppConstants.spotifyRedirectUri,
+      'redirect_uri': _currentRedirectUri!,
       'state': _generateRandomString(AppConstants.stateLength),
     };
 
@@ -44,8 +57,28 @@ class SpotifyAuthService {
   }
 
   // Start Spotify Login Flow
-  static Future<bool> startLogin() async {
+  static Future<bool> startLogin({Function(String)? onCodeReceived}) async {
     try {
+      // For desktop platforms, start local server first to get dynamic port
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        if (onCodeReceived != null) {
+          final serverResult = await LocalServerService.startServer(
+            onCodeReceived: onCodeReceived,
+          );
+
+          if (serverResult == null) {
+            print('Failed to start local server');
+            return false;
+          }
+
+          // Use the dynamic redirect URI from the server
+          _currentRedirectUri = serverResult['redirectUri'];
+        }
+      } else {
+        // Mobile platforms use the predefined redirect URI
+        _currentRedirectUri = AppConstants.spotifyRedirectUriMobile;
+      }
+
       // Generate PKCE codes
       _codeVerifier = _generateRandomString(AppConstants.codeVerifierLength);
       final codeChallenge = _generateCodeChallenge(_codeVerifier!);
@@ -54,6 +87,7 @@ class SpotifyAuthService {
       final authUrl = _buildSpotifyAuthUrl(codeChallenge);
 
       print('Opening Spotify URL: $authUrl');
+      print('Using redirect URI: $_currentRedirectUri');
 
       // Launch Spotify login
       final launched = await launchUrl(
@@ -74,10 +108,15 @@ class SpotifyAuthService {
       throw Exception('Code verifier not found. Start login flow first.');
     }
 
+    if (_currentRedirectUri == null) {
+      throw Exception('Redirect URI not set. Start login flow first.');
+    }
+
     try {
       print('Exchanging code for token...');
       print('Code: ${code.substring(0, 20)}...');
       print('Code verifier: ${_codeVerifier?.substring(0, 20)}...');
+      print('Redirect URI: $_currentRedirectUri');
 
       final response = await http.post(
         Uri.parse(AppConstants.spotifyTokenUrl),
@@ -85,7 +124,7 @@ class SpotifyAuthService {
         body: {
           'grant_type': 'authorization_code',
           'code': code,
-          'redirect_uri': AppConstants.spotifyRedirectUri,
+          'redirect_uri': _currentRedirectUri!,
           'client_id': AppConstants.spotifyClientId,
           'code_verifier': _codeVerifier!,
         },
@@ -138,7 +177,7 @@ class SpotifyAuthService {
     }
   }
 
-  // Refresh Access Token (placeholder for future implementation)
+  // Refresh Access Token
   static Future<Map<String, dynamic>?> refreshToken(String refreshToken) async {
     try {
       final response = await http.post(
@@ -168,9 +207,15 @@ class SpotifyAuthService {
     }
   }
 
-  // Clear stored code verifier
-  static void clearCodeVerifier() {
+  // Clear stored code verifier and stop server
+  static Future<void> clearCodeVerifier() async {
     _codeVerifier = null;
+    _currentRedirectUri = null;
+
+    // Stop local server if running
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      await LocalServerService.stopServer();
+    }
   }
 
   // Get current code verifier (for debugging)

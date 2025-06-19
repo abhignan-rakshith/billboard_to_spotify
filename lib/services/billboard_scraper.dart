@@ -5,13 +5,15 @@ class BillboardScraperService {
   static const String BILLBOARD_URL =
       'https://www.billboard.com/charts/hot-100/';
 
-  static Future<Map<String, List<String>>> scrapeHot100() async {
+  static Future<Map<String, List<String>>> scrapeHot100({String? customUrl}) async {
     List<String> songNames = [];
     List<String> artistNames = [];
 
+    final url = customUrl ?? BILLBOARD_URL;
+
     try {
       final response = await http.get(
-        Uri.parse(BILLBOARD_URL),
+        Uri.parse(url),
         headers: {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

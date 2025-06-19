@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
 import '../services/spotify_auth_service.dart';
 import '../services/secure_storage_service.dart';
+import 'billboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,7 +23,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _setupDeepLinkListener();
+
+    // Only setup deep link listener for mobile platforms
+    if (Platform.isAndroid || Platform.isIOS) {
+      _setupDeepLinkListener();
+    }
 
     // Check for existing login on app startup
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -30,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _setupDeepLinkListener() {
-    // Listen for incoming deep links
+    // Listen for incoming deep links (mobile only)
     const platform = MethodChannel('flutter/deeplink');
     platform.setMethodCallHandler(_handleDeepLink);
   }
@@ -38,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<dynamic> _handleDeepLink(MethodCall call) async {
     if (call.method == 'incoming_link') {
       final String? link = call.arguments;
-      if (link != null && link.startsWith(AppConstants.spotifyRedirectUri)) {
+      if (link != null && link.startsWith(AppConstants.spotifyRedirectUriMobile)) {
         await _processSpotifyCallback(link);
       }
     }
@@ -207,7 +213,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final launched = await SpotifyAuthService.startLogin();
+      // Pass callback for desktop platforms
+      final launched = await SpotifyAuthService.startLogin(
+        onCodeReceived: (code) {
+          // This will be called when the local server receives the code
+          _exchangeCodeForToken(code);
+        },
+      );
 
       if (launched) {
         setState(() {
@@ -229,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _logout() async {
     await SecureStorageService.clearAllData();
-    SpotifyAuthService.clearCodeVerifier();
+    await SpotifyAuthService.clearCodeVerifier(); // Now this is async
 
     setState(() {
       _accessToken = null;
@@ -287,14 +299,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: AppConstants.buttonHeight,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('🎵 Billboard conversion coming soon!'),
-                          backgroundColor: ThemeConfig.successGreen,
-                        ),
-                      );
-                    },
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BillboardScreen(),
+                          ),
+                        );
+                      },
                     icon: const Icon(Icons.playlist_add),
                     label: const Text('Create Billboard Playlist'),
                     style: ThemeConfig.secondaryButtonStyle,
@@ -438,8 +450,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _debugInfoRow('Client ID', AppConstants.spotifyClientId),
-                  _debugInfoRow('Redirect', AppConstants.spotifyRedirectUri),
-                  _debugInfoRow('Code Verifier', '${SpotifyAuthService.codeVerifier!.substring(0, 20)}...'),
+                  _debugInfoRow('Redirect (Mobile)', AppConstants.spotifyRedirectUriMobile),
+                  _debugInfoRow('Redirect (Desktop)', AppConstants.spotifyRedirectUriDesktop),
+                  _debugInfoRow('Current Platform', Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : Platform.isWindows ? 'Windows' : Platform.isMacOS ? 'macOS' : 'Other'),
+                  if (SpotifyAuthService.codeVerifier != null)
+                    _debugInfoRow('Code Verifier', '${SpotifyAuthService.codeVerifier!.substring(0, 20)}...'),
                 ],
               ),
             ),

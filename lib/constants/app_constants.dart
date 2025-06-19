@@ -4,7 +4,11 @@ class AppConstants {
 
   // Spotify OAuth Configuration
   static const String spotifyClientId = 'cf9af4f27a004bdb89e5cf506df848ee';
-  static const String spotifyRedirectUri = 'com.abhignan.billboardspotify://callback';
+
+  // Platform-specific redirect URIs
+  static const String spotifyRedirectUriMobile = 'com.abhignan.billboardspotify://callback';
+  static const String spotifyRedirectUriDesktop = 'http://127.0.0.1:8080/callback';
+
   static const String spotifyScopes = 'playlist-modify-public playlist-modify-private user-read-private user-read-email';
 
   // API URLs
@@ -37,4 +41,11 @@ class AppConstants {
 
   // Token Settings
   static const int tokenBufferSeconds = 60; // 1 minute buffer before expiry
+
+  // Platform helper
+  static String get redirectUri {
+    // You'll need to import dart:io and check Platform.isWindows/Platform.isLinux/Platform.isMacOS
+    // For now, we'll handle this in the auth service
+    return spotifyRedirectUriMobile;
+  }
 }
