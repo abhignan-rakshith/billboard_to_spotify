@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
 import '../services/billboard_scraper.dart';
+import 'results_screen.dart';
 
 class BillboardScreen extends StatefulWidget {
   const BillboardScreen({super.key});
@@ -70,6 +71,22 @@ class _BillboardScreenState extends State<BillboardScreen> {
               backgroundColor: ThemeConfig.successGreen,
             ),
           );
+
+          // Navigate to results screen after 2 seconds
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ResultsScreen(
+                    selectedDate: '${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}',
+                    songs: scrapedData['songs'] ?? [],
+                    artists: scrapedData['artists'] ?? [],
+                  ),
+                ),
+              );
+            }
+          });
         }
       }
 
@@ -132,7 +149,7 @@ class _BillboardScreenState extends State<BillboardScreen> {
 
               // Selected Date Display
               Text(
-                'Selected: ${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+                'Selected: ${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}',
                 style: ThemeConfig.bodyStyle,
               ),
               const SizedBox(height: AppConstants.largePadding),
