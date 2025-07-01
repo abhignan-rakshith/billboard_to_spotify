@@ -43,7 +43,10 @@ class BillboardScraperService {
           try {
             // Get song name
             final songElement = container.querySelector('h3.c-title');
-            final songName = songElement?.text.trim() ?? '';
+            final rawSongName = songElement?.text.trim() ?? '';
+
+            // Clean the song name by removing parentheses content
+            final cleanedSongName = _cleanSongTitle(rawSongName);
 
             // Get artist name from spans, skipping chart indicators
             final allSpans = container.querySelectorAll('span.c-label');
@@ -68,9 +71,16 @@ class BillboardScraperService {
 
             final firstArtist = _extractFirstArtist(artistName);
 
-            if (songName.isNotEmpty && firstArtist.isNotEmpty) {
-              songNames.add(songName);
+            if (cleanedSongName.isNotEmpty && firstArtist.isNotEmpty) {
+              songNames.add(cleanedSongName);
               artistNames.add(firstArtist);
+
+              // Log the cleaning for debugging
+              if (rawSongName != cleanedSongName) {
+                print(
+                  'Cleaned song title: "$rawSongName" -> "$cleanedSongName"',
+                );
+              }
             }
           } catch (e) {
             print('Error parsing entry ${i + 1}: $e');
@@ -87,6 +97,26 @@ class BillboardScraperService {
     }
 
     return <String, List<String>>{'songs': songNames, 'artists': artistNames};
+  }
+
+  // NEW: Clean song titles by removing parentheses content
+  static String _cleanSongTitle(String songTitle) {
+    if (songTitle.isEmpty) return '';
+
+    // Remove everything in parentheses including the parentheses themselves
+    // This regex matches opening parenthesis, any content, and closing parenthesis
+    String cleaned = songTitle.replaceAll(RegExp(r'\s*\([^)]*\)\s*'), '');
+
+    // Also remove content in square brackets (sometimes used instead)
+    cleaned = cleaned.replaceAll(RegExp(r'\s*\[[^\]]*\]\s*'), '');
+
+    // Clean up any double spaces that might result from removal
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
+
+    // Trim any leading/trailing whitespace
+    cleaned = cleaned.trim();
+
+    return cleaned;
   }
 
   static String _extractFirstArtist(String fullArtistString) {

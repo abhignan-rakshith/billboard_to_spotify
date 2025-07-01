@@ -344,4 +344,113 @@ class SpotifyPlaylistService {
       rethrow;
     }
   }
+
+  // Get all user playlists (paginated)
+  static Future<List<Map<String, dynamic>>> getAllUserPlaylists() async {
+    try {
+      final accessToken = await SecureStorageService.getAccessToken();
+      final userId = await getUserId();
+
+      if (accessToken == null) {
+        throw Exception('Access token not found');
+      }
+
+      List<Map<String, dynamic>> allPlaylists = [];
+      String? nextUrl =
+          'https://api.spotify.com/v1/users/$userId/playlists?limit=50';
+
+      // Fetch all playlists with pagination
+      while (nextUrl != null) {
+        final response = await HttpHelper.requestWithRetry(
+          () => http.get(
+            Uri.parse(nextUrl!),
+            headers: {'Authorization': 'Bearer $accessToken'},
+          ),
+        );
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final playlists = data['items'] as List;
+
+          // Add playlist info we need
+          for (final playlist in playlists) {
+            // Only include playlists owned by the user (not followed playlists)
+            if (playlist['owner']['id'] == userId) {
+              allPlaylists.add({
+                'id': playlist['id'],
+                'name': playlist['name'],
+                'description': playlist['description'] ?? '',
+                'trackCount': playlist['tracks']['total'],
+                'public': playlist['public'],
+                'images': playlist['images'],
+                'external_urls': playlist['external_urls'],
+              });
+            }
+          }
+
+          // Check if there are more pages
+          nextUrl = data['next'];
+        } else {
+          throw Exception('Failed to fetch playlists: ${response.statusCode}');
+        }
+      }
+
+      print('Retrieved ${allPlaylists.length} user playlists');
+      return allPlaylists;
+    } catch (e) {
+      print('Error fetching user playlists: $e');
+      rethrow;
+    }
+  }
+
+  // Delete multiple playlists with progress tracking
+  static Future<Map<String, dynamic>> deleteMultiplePlaylists({
+    required List<String> playlistIds,
+    Function(int completed, int total, String? currentPlaylistName)? onProgress,
+  }) async {
+    int successful = 0;
+    int failed = 0;
+    List<Map<String, dynamic>> errors = [];
+
+    for (int i = 0; i < playlistIds.length; i++) {
+      final playlistId = playlistIds[i];
+
+      try {
+        onProgress?.call(
+          i,
+          playlistIds.length,
+          'Deleting playlist ${i + 1}...',
+        );
+
+        final success = await deletePlaylist(playlistId);
+
+        if (success) {
+          successful++;
+        } else {
+          failed++;
+          errors.add({
+            'playlistId': playlistId,
+            'error': 'Failed to delete playlist',
+          });
+        }
+      } catch (e) {
+        failed++;
+        errors.add({'playlistId': playlistId, 'error': e.toString()});
+      }
+
+      // Small delay between deletions to avoid rate limiting
+      if (i < playlistIds.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    }
+
+    onProgress?.call(playlistIds.length, playlistIds.length, 'Completed');
+
+    return {
+      'successful': successful,
+      'failed': failed,
+      'errors': errors,
+      'total': playlistIds.length,
+    };
+  }
 }

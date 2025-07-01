@@ -356,6 +356,32 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: AppConstants.defaultPadding),
+
+        // NEW: Manage Playlists Button
+        SizedBox(
+          width: double.infinity,
+          height: AppConstants.buttonHeight,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.managePlaylists);
+            },
+            icon: const Icon(Icons.playlist_remove),
+            label: const Text('Manage Playlists'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppConstants.defaultPadding),
+
         SizedBox(
           width: double.infinity,
           height: AppConstants.smallButtonHeight,

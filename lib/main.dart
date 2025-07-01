@@ -6,6 +6,7 @@ import 'screens/login_screen.dart';
 import 'screens/billboard_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/playlist_creation_screen.dart';
+import 'screens/manage_playlists_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -24,6 +25,7 @@ class MyApp extends StatelessWidget {
       routes: {
         AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.billboard: (context) => const BillboardScreen(),
+        AppRoutes.managePlaylists: (context) => const ManagePlaylistsScreen(),
       },
       onGenerateRoute: (settings) {
         switch (settings.name) {
