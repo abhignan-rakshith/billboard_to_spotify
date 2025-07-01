@@ -7,6 +7,7 @@ import 'screens/billboard_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/playlist_creation_screen.dart';
 import 'screens/manage_playlists_screen.dart';
+import 'screens/curated_playlist_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.billboard: (context) => const BillboardScreen(),
         AppRoutes.managePlaylists: (context) => const ManagePlaylistsScreen(),
+        AppRoutes.curatedPlaylist: (context) => const CuratedPlaylistScreen(),
       },
       onGenerateRoute: (settings) {
         switch (settings.name) {
@@ -45,6 +47,8 @@ class MyApp extends StatelessWidget {
                 selectedDate: args['selectedDate'],
                 songs: args['songs'],
                 artists: args['artists'],
+                customPlaylistName: args['customPlaylistName'],
+                customDescription: args['customDescription'],
               ),
             );
           default:

@@ -8,12 +8,16 @@ class PlaylistCreationScreen extends StatefulWidget {
   final String selectedDate;
   final List<String> songs;
   final List<String> artists;
+  final String? customPlaylistName;
+  final String? customDescription;
 
   const PlaylistCreationScreen({
     super.key,
     required this.selectedDate,
     required this.songs,
     required this.artists,
+    this.customPlaylistName,
+    this.customDescription,
   });
 
   @override
@@ -39,11 +43,18 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
   // Cancellation token for current search
   String? _currentSearchId;
 
+  // Check if this is a custom curated playlist
+  bool get _isCustomPlaylist => widget.customPlaylistName != null;
+
   @override
   void initState() {
     super.initState();
-    // Set default playlist name
-    _playlistNameController.text = 'BTS Hot 100: ${widget.selectedDate}';
+    // Set playlist name based on type
+    if (_isCustomPlaylist) {
+      _playlistNameController.text = widget.customPlaylistName!;
+    } else {
+      _playlistNameController.text = 'BTS Hot 100: ${widget.selectedDate}';
+    }
   }
 
   @override
@@ -649,11 +660,20 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
         return;
       }
 
-      // Step 2: Create the playlist
+      // Step 2: Create the playlist with appropriate description
+      String description;
+      if (_isCustomPlaylist) {
+        description = widget.customDescription?.isNotEmpty == true
+            ? widget.customDescription!
+            : 'Custom curated playlist with ${finalOrderedUris.length} songs';
+      } else {
+        description =
+            'Billboard Hot 100 chart from ${widget.selectedDate} (${finalOrderedUris.length} songs in chart order)';
+      }
+
       final playlistId = await SpotifyPlaylistService.createPlaylist(
         name: _playlistNameController.text,
-        description:
-            'Billboard Hot 100 chart from ${widget.selectedDate} (${finalOrderedUris.length} songs in chart order)',
+        description: description,
       );
 
       print('Created playlist with ID: $playlistId');
@@ -670,15 +690,19 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
         });
 
         if (success) {
-          final positionsText =
-              _positionedUris.keys.length < widget.songs.length
-              ? ' (songs in original chart order)'
-              : '';
+          final typeText = _isCustomPlaylist
+              ? 'curated playlist'
+              : 'Billboard playlist';
+          final positionsText = _isCustomPlaylist
+              ? ''
+              : (_positionedUris.keys.length < widget.songs.length
+                    ? ' (songs in original chart order)'
+                    : '');
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '🎉 Successfully created playlist "${_playlistNameController.text}" with ${finalOrderedUris.length} songs$positionsText!',
+                '🎉 Successfully created $typeText "${_playlistNameController.text}" with ${finalOrderedUris.length} songs$positionsText!',
               ),
               backgroundColor: ThemeConfig.successGreen,
               duration: const Duration(seconds: 4),

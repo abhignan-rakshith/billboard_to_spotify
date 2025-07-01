@@ -4,4 +4,5 @@ class AppRoutes {
   static const String results = '/results';
   static const String playlistCreation = '/playlist-creation';
   static const String managePlaylists = '/manage-playlists';
+  static const String curatedPlaylist = '/curated-playlist';
 }

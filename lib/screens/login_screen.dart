@@ -357,6 +357,31 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: AppConstants.defaultPadding),
 
+        // NEW: Add Curated Playlist Button
+        SizedBox(
+          width: double.infinity,
+          height: AppConstants.buttonHeight,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.curatedPlaylist);
+            },
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Add Curated Playlist'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppConstants.defaultPadding),
+
         // NEW: Manage Playlists Button
         SizedBox(
           width: double.infinity,
