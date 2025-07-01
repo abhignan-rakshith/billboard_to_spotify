@@ -5,7 +5,9 @@ class BillboardScraperService {
   static const String BILLBOARD_URL =
       'https://www.billboard.com/charts/hot-100/';
 
-  static Future<Map<String, List<String>>> scrapeHot100({String? customUrl}) async {
+  static Future<Map<String, List<String>>> scrapeHot100({
+    String? customUrl,
+  }) async {
     List<String> songNames = [];
     List<String> artistNames = [];
 
@@ -101,6 +103,7 @@ class BillboardScraperService {
       ' And ',
       ' with ',
       ' With ',
+      ' Duet ',
       ',',
     ];
 
