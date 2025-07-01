@@ -294,4 +294,54 @@ class SpotifyPlaylistService {
       return false;
     }
   }
+
+  // Search for multiple songs (returns top results for manual selection)
+  static Future<List<Map<String, dynamic>>> searchMultipleSongs({
+    required String query,
+    int limit = 5,
+  }) async {
+    try {
+      final accessToken = await SecureStorageService.getAccessToken();
+
+      if (accessToken == null) {
+        throw Exception('Access token not found');
+      }
+
+      // Encode the search query
+      final encodedQuery = Uri.encodeComponent(query);
+
+      final response = await HttpHelper.searchWithRetry(
+        () => http.get(
+          Uri.parse(
+            'https://api.spotify.com/v1/search?q=$encodedQuery&type=track&limit=$limit',
+          ),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final tracks = data['tracks']['items'] as List;
+
+        // Return detailed track information for display
+        return tracks.map<Map<String, dynamic>>((track) {
+          return {
+            'id': track['id'],
+            'uri': track['uri'],
+            'name': track['name'],
+            'artists': track['artists'],
+            'album': track['album'],
+            'duration_ms': track['duration_ms'],
+            'preview_url': track['preview_url'],
+            'external_urls': track['external_urls'],
+          };
+        }).toList();
+      } else {
+        throw Exception('Search failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error searching for multiple songs with query "$query": $e');
+      rethrow;
+    }
+  }
 }

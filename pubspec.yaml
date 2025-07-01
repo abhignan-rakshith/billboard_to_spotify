@@ -1,5 +1,5 @@
 name: billboard_to_spotify
-description: "A new Flutter project."
+description: "A Flutter application that allows users to search for Billboard charts and open them in Spotify."
 publish_to: "none"
 
 version: 1.0.0+1

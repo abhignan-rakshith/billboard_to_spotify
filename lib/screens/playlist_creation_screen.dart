@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
 import '../services/spotify_playlist_service.dart';
+import 'manual_song_search_screen.dart';
 
 class PlaylistCreationScreen extends StatefulWidget {
   final String selectedDate;
@@ -31,6 +32,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
   int _totalSongsFound = 0;
   int _searchProgress = 0;
   int _totalSongs = 0;
+
+  // Position-based URI tracking for manual search integration
+  Map<int, String> _positionedUris = {}; // Map of position -> URI
 
   // Cancellation token for current search
   String? _currentSearchId;
@@ -225,6 +229,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
           _isSearching = false;
           _searchCompleted = true;
         });
+
+        // Update positioned URIs after automatic search
+        _updateFoundUrisWithPositions();
 
         print('Found $totalFound out of ${widget.songs.length} songs');
       }
@@ -441,12 +448,41 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
                 ),
               ),
             ),
+
+          // Manual Search Button
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isCreatingPlaylist ? null : _startManualSearch,
+              icon: const Icon(Icons.search_rounded, size: 18),
+              label: const Text(
+                'Find Missing Songs Manually',
+                style: TextStyle(fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.orange[700],
+                side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 12,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildCreatePlaylistButton() {
+    final hasManualSearch = _notFoundSongs.isNotEmpty;
+    final buttonText = _isCreatingPlaylist
+        ? 'Creating Playlist...'
+        : hasManualSearch
+        ? 'Create Playlist (${_positionedUris.length} songs)'
+        : 'Create Playlist on Spotify';
+
     return Container(
       width: double.infinity,
       height: AppConstants.buttonHeight,
@@ -481,9 +517,7 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
               )
             : const Icon(Icons.playlist_add_rounded, color: Colors.white),
         label: Text(
-          _isCreatingPlaylist
-              ? 'Creating Playlist...'
-              : 'Create Playlist on Spotify',
+          buttonText,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -502,6 +536,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
   }
 
   Widget _buildPlaylistDescription() {
+    final currentFound = _positionedUris.length;
+    final missingCount = _notFoundSongs.length;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -523,10 +560,22 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Will add $_totalSongsFound songs • ${widget.selectedDate}',
+            'Will add $currentFound songs • ${widget.selectedDate}',
             style: ThemeConfig.subtitleStyle.copyWith(fontSize: 11),
             textAlign: TextAlign.center,
           ),
+          if (missingCount > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              '$missingCount songs still missing - use manual search to find them',
+              style: ThemeConfig.subtitleStyle.copyWith(
+                fontSize: 10,
+                color: Colors.orange[600],
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );
@@ -560,7 +609,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
   }
 
   void _createPlaylistOnSpotify() async {
-    if (_foundUris.isEmpty) {
+    final finalOrderedUris = _getFinalOrderedUris();
+
+    if (finalOrderedUris.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('❌ No songs found to add to playlist'),
@@ -601,15 +652,16 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
       // Step 2: Create the playlist
       final playlistId = await SpotifyPlaylistService.createPlaylist(
         name: _playlistNameController.text,
-        description: 'Billboard Hot 100 chart from ${widget.selectedDate}',
+        description:
+            'Billboard Hot 100 chart from ${widget.selectedDate} (${finalOrderedUris.length} songs in chart order)',
       );
 
       print('Created playlist with ID: $playlistId');
 
-      // Step 3: Add songs to playlist
+      // Step 3: Add songs to playlist in correct order
       final success = await SpotifyPlaylistService.addSongsToPlaylist(
         playlistId: playlistId,
-        uris: _foundUris,
+        uris: finalOrderedUris, // Use ordered URIs
       );
 
       if (mounted) {
@@ -618,10 +670,15 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
         });
 
         if (success) {
+          final positionsText =
+              _positionedUris.keys.length < widget.songs.length
+              ? ' (songs in original chart order)'
+              : '';
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '🎉 Successfully created playlist "${_playlistNameController.text}" with $_totalSongsFound songs!',
+                '🎉 Successfully created playlist "${_playlistNameController.text}" with ${finalOrderedUris.length} songs$positionsText!',
               ),
               backgroundColor: ThemeConfig.successGreen,
               duration: const Duration(seconds: 4),
@@ -650,5 +707,103 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
         );
       }
     }
+  }
+
+  // Manual search method
+  void _startManualSearch() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManualSongSearchScreen(
+          missingSongs: _notFoundSongs,
+          totalSongsCount: widget.songs.length,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      final manuallyFoundUris = result['manuallyFoundUris'] as List<String>;
+      final foundPositions = result['updatedPositions'] as List<int>;
+
+      setState(() {
+        // Add manually found songs to positioned URIs map
+        for (int i = 0; i < manuallyFoundUris.length; i++) {
+          _positionedUris[foundPositions[i]] = manuallyFoundUris[i];
+        }
+
+        // Update total count
+        _totalSongsFound += manuallyFoundUris.length;
+
+        // Remove manually found songs from not found list
+        _notFoundSongs.removeWhere(
+          (song) => foundPositions.contains(song['position'] - 1),
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '✅ Added ${manuallyFoundUris.length} more songs manually!',
+          ),
+          backgroundColor: ThemeConfig.successGreen,
+        ),
+      );
+    }
+  }
+
+  // Update positioned URIs with current auto-found songs
+  void _updateFoundUrisWithPositions() {
+    // Preserve manually found positions
+    final manuallyFoundPositions = <int, String>{};
+
+    // Find manually found positions by checking which songs were manually found
+    for (final entry in _positionedUris.entries) {
+      // If this URI is not in the auto-found URIs, it's manually found
+      if (!_foundUris.contains(entry.value)) {
+        manuallyFoundPositions[entry.key] = entry.value;
+      }
+    }
+
+    // Clear and rebuild positioned URIs
+    _positionedUris.clear();
+    _positionedUris.addAll(manuallyFoundPositions);
+
+    // Add automatically found songs with their positions
+    int autoFoundIndex = 0;
+    for (int position = 0; position < widget.songs.length; position++) {
+      // Skip if this position already has a manually found song
+      if (_positionedUris.containsKey(position)) {
+        continue;
+      }
+
+      // Check if this position is in the not found list
+      bool isNotFound = _notFoundSongs.any(
+        (song) => song['position'] - 1 == position,
+      );
+
+      // If not in missing list and we have auto-found URIs left, add it
+      if (!isNotFound && autoFoundIndex < _foundUris.length) {
+        _positionedUris[position] = _foundUris[autoFoundIndex];
+        autoFoundIndex++;
+      }
+    }
+
+    print(
+      'Positioned URIs: ${_positionedUris.length} songs in correct positions',
+    );
+  }
+
+  // Get final ordered URIs list for playlist creation
+  List<String> _getFinalOrderedUris() {
+    List<String> orderedUris = [];
+
+    // Sort positions and add URIs in order
+    final sortedPositions = _positionedUris.keys.toList()..sort();
+
+    for (final position in sortedPositions) {
+      orderedUris.add(_positionedUris[position]!);
+    }
+
+    return orderedUris;
   }
 }
