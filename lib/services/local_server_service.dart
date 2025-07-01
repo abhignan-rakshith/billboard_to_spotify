@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import '../constants/app_constants.dart';
 
 class LocalServerService {
   static HttpServer? _server;
@@ -17,13 +18,25 @@ class LocalServerService {
 
       // Try to bind to a random available port
       final random = Random();
-      for (int attempt = 0; attempt < 10; attempt++) {
+      for (
+        int attempt = 0;
+        attempt < AppConstants.serverBindAttempts;
+        attempt++
+      ) {
         try {
-          _currentPort = 8080 + random.nextInt(1000); // Port between 8080-9080
-          _server = await HttpServer.bind(InternetAddress.loopbackIPv4, _currentPort!);
+          _currentPort =
+              AppConstants.serverPortRangeStart +
+              random.nextInt(
+                AppConstants.serverPortRangeEnd -
+                    AppConstants.serverPortRangeStart,
+              );
+          _server = await HttpServer.bind(
+            InternetAddress.loopbackIPv4,
+            _currentPort!,
+          );
           break;
         } catch (e) {
-          if (attempt == 9) rethrow;
+          if (attempt == AppConstants.serverBindAttempts - 1) rethrow;
           continue;
         }
       }
@@ -136,10 +149,7 @@ class LocalServerService {
         }
       });
 
-      return {
-        'port': _currentPort,
-        'redirectUri': redirectUri,
-      };
+      return {'port': _currentPort, 'redirectUri': redirectUri};
     } catch (e) {
       print('Error starting local server: $e');
       return null;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
+import '../config/app_routes.dart';
 import 'playlist_creation_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       }
     });
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,7 +52,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 decoration: BoxDecoration(
                   color: ThemeConfig.spotifyGreen.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ThemeConfig.spotifyGreen.withOpacity(0.3)),
+                  border: Border.all(
+                    color: ThemeConfig.spotifyGreen.withOpacity(0.3),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -79,15 +83,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
                       height: AppConstants.smallButtonHeight,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(
+                          Navigator.pushNamed(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => PlaylistCreationScreen(
-                                selectedDate: widget.selectedDate,
-                                songs: widget.songs,
-                                artists: widget.artists,
-                              ),
-                            ),
+                            AppRoutes.playlistCreation,
+                            arguments: {
+                              'selectedDate': widget.selectedDate,
+                              'songs': widget.songs,
+                              'artists': widget.artists,
+                            },
                           );
                         },
                         icon: const Icon(Icons.playlist_add),
@@ -108,10 +111,14 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     // Song cards
                     final isExpanded = _expandedCards.contains(index);
                     final songName = widget.songs[index];
-                    final artistName = index < widget.artists.length ? widget.artists[index] : 'Unknown Artist';
+                    final artistName = index < widget.artists.length
+                        ? widget.artists[index]
+                        : 'Unknown Artist';
 
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: AppConstants.smallPadding),
+                      padding: const EdgeInsets.only(
+                        bottom: AppConstants.smallPadding,
+                      ),
                       child: Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(
@@ -121,7 +128,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                           borderRadius: BorderRadius.circular(12),
                           onTap: () => _toggleCard(index),
                           child: Padding(
-                            padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                            padding: const EdgeInsets.all(
+                              AppConstants.defaultPadding,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -146,7 +155,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: AppConstants.defaultPadding),
+                                    const SizedBox(
+                                      width: AppConstants.defaultPadding,
+                                    ),
 
                                     // Song name and expand icon
                                     Expanded(
@@ -161,7 +172,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                                       ),
                                     ),
                                     Icon(
-                                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                                      isExpanded
+                                          ? Icons.expand_less
+                                          : Icons.expand_more,
                                       color: ThemeConfig.spotifyGreen,
                                     ),
                                   ],
@@ -169,7 +182,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
                                 // Artist name (shown when expanded)
                                 if (isExpanded) ...[
-                                  const SizedBox(height: AppConstants.smallPadding),
+                                  const SizedBox(
+                                    height: AppConstants.smallPadding,
+                                  ),
                                   Padding(
                                     padding: const EdgeInsets.only(left: 48.0),
                                     child: Text(

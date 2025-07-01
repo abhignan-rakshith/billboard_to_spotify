@@ -3,7 +3,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
+import '../config/app_routes.dart';
 import '../services/billboard_scraper.dart';
+import '../utils/error_handler.dart';
+import '../utils/connectivity_helper.dart';
 import 'results_screen.dart';
 
 class BillboardScreen extends StatefulWidget {
@@ -19,14 +22,27 @@ class _BillboardScreenState extends State<BillboardScreen> {
   bool _isLoading = false;
 
   Future<void> _scanBillboardChart() async {
+    // Check connectivity first
+    if (!await ConnectivityHelper.hasConnection()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('📶 ${ConnectivityHelper.getOfflineMessage()}'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       // Format the date for Billboard URL
-      final formattedDate = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
-      final billboardUrl = 'https://www.billboard.com/charts/hot-100/$formattedDate/';
+      final formattedDate =
+          '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+      final billboardUrl =
+          'https://www.billboard.com/charts/hot-100/$formattedDate/';
 
       print('Scanning Billboard chart for date: $formattedDate');
       print('Billboard URL: $billboardUrl');
@@ -56,7 +72,9 @@ class _BillboardScreenState extends State<BillboardScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('⚠️ No chart data found for $formattedDate.\n\nThe Billboard Hot 100 is updated on Tuesdays. This date may not have a published chart yet, or the chart may not be available for historical dates.'),
+              content: Text(
+                '⚠️ No chart data found for $formattedDate.\n\nThe Billboard Hot 100 is updated on Tuesdays. This date may not have a published chart yet, or the chart may not be available for historical dates.',
+              ),
               backgroundColor: Colors.orange,
               duration: const Duration(seconds: 5),
             ),
@@ -75,28 +93,28 @@ class _BillboardScreenState extends State<BillboardScreen> {
           // Navigate to results screen after 2 seconds
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted) {
-              Navigator.push(
+              Navigator.pushNamed(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => ResultsScreen(
-                    selectedDate: '${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}',
-                    songs: scrapedData['songs'] ?? [],
-                    artists: scrapedData['artists'] ?? [],
-                  ),
-                ),
+                AppRoutes.results,
+                arguments: {
+                  'selectedDate':
+                      '${_selectedDate.day.toString().padLeft(2, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.year}',
+                  'songs': scrapedData['songs'] ?? [],
+                  'artists': scrapedData['artists'] ?? [],
+                },
               );
             }
           });
         }
       }
-
     } catch (e) {
       print('Error scanning chart: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Error scanning chart: $e'),
+            content: Text('❌ ${ErrorHandler.getReadableError(e)}'),
             backgroundColor: ThemeConfig.errorRed,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -136,7 +154,11 @@ class _BillboardScreenState extends State<BillboardScreen> {
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.date,
                   initialDateTime: _selectedDate,
-                  minimumDate: DateTime(1958, 8, 4), // First Billboard Hot 100
+                  minimumDate: DateTime(
+                    AppConstants.billboardStartYear,
+                    AppConstants.billboardStartMonth,
+                    AppConstants.billboardStartDay,
+                  ), // First Billboard Hot 100
                   maximumDate: DateTime.now(),
                   onDateTimeChanged: (DateTime newDate) {
                     setState(() {
@@ -167,10 +189,7 @@ class _BillboardScreenState extends State<BillboardScreen> {
                     },
                     activeColor: ThemeConfig.spotifyGreen,
                   ),
-                  const Text(
-                    'Open website',
-                    style: ThemeConfig.bodyStyle,
-                  ),
+                  const Text('Open website', style: ThemeConfig.bodyStyle),
                 ],
               ),
               const SizedBox(height: AppConstants.largePadding),
@@ -183,15 +202,17 @@ class _BillboardScreenState extends State<BillboardScreen> {
                   onPressed: _isLoading ? null : _scanBillboardChart,
                   icon: _isLoading
                       ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.search),
-                  label: Text(_isLoading ? 'Scanning...' : 'Scan Billboard Chart'),
+                  label: Text(
+                    _isLoading ? 'Scanning...' : 'Scan Billboard Chart',
+                  ),
                   style: ThemeConfig.primaryButtonStyle,
                 ),
               ),

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import 'local_server_service.dart';
+import 'http_helper.dart';
 
 class SpotifyAuthService {
   static String? _codeVerifier;
@@ -26,7 +27,8 @@ class SpotifyAuthService {
     final random = Random.secure();
     return List.generate(
       length,
-          (i) => AppConstants.pkceChars[random.nextInt(AppConstants.pkceChars.length)],
+      (i) =>
+          AppConstants.pkceChars[random.nextInt(AppConstants.pkceChars.length)],
     ).join();
   }
 
@@ -118,16 +120,18 @@ class SpotifyAuthService {
       print('Code verifier: ${_codeVerifier?.substring(0, 20)}...');
       print('Redirect URI: $_currentRedirectUri');
 
-      final response = await http.post(
-        Uri.parse(AppConstants.spotifyTokenUrl),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'grant_type': 'authorization_code',
-          'code': code,
-          'redirect_uri': _currentRedirectUri!,
-          'client_id': AppConstants.spotifyClientId,
-          'code_verifier': _codeVerifier!,
-        },
+      final response = await HttpHelper.requestWithRetry(
+        () => http.post(
+          Uri.parse(AppConstants.spotifyTokenUrl),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': _currentRedirectUri!,
+            'client_id': AppConstants.spotifyClientId,
+            'code_verifier': _codeVerifier!,
+          },
+        ),
       );
 
       print('Token response status: ${response.statusCode}');
@@ -142,7 +146,9 @@ class SpotifyAuthService {
         };
       } else {
         final error = json.decode(response.body);
-        throw Exception('Token exchange failed: ${error['error_description'] ?? error['error']}');
+        throw Exception(
+          'Token exchange failed: ${error['error_description'] ?? error['error']}',
+        );
       }
     } catch (e) {
       print('Token exchange error: $e');
@@ -153,7 +159,9 @@ class SpotifyAuthService {
   // Get User Profile
   static Future<Map<String, dynamic>> getUserProfile(String accessToken) async {
     try {
-      print('Getting user profile with token: ${accessToken.substring(0, 20)}...');
+      print(
+        'Getting user profile with token: ${accessToken.substring(0, 20)}...',
+      );
 
       final response = await http.get(
         Uri.parse(AppConstants.spotifyProfileUrl),
@@ -169,7 +177,9 @@ class SpotifyAuthService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('Failed to get user profile: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Failed to get user profile: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('Profile error: $e');
@@ -180,25 +190,30 @@ class SpotifyAuthService {
   // Refresh Access Token
   static Future<Map<String, dynamic>?> refreshToken(String refreshToken) async {
     try {
-      final response = await http.post(
-        Uri.parse(AppConstants.spotifyTokenUrl),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'grant_type': 'refresh_token',
-          'refresh_token': refreshToken,
-          'client_id': AppConstants.spotifyClientId,
-        },
+      final response = await HttpHelper.requestWithRetry(
+        () => http.post(
+          Uri.parse(AppConstants.spotifyTokenUrl),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'grant_type': 'refresh_token',
+            'refresh_token': refreshToken,
+            'client_id': AppConstants.spotifyClientId,
+          },
+        ),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return {
           'access_token': data['access_token'],
-          'refresh_token': data['refresh_token'] ?? refreshToken, // Keep old if not provided
+          'refresh_token':
+              data['refresh_token'] ?? refreshToken, // Keep old if not provided
           'expires_in': data['expires_in'] ?? 3600,
         };
       } else {
-        print('Refresh token failed: ${response.statusCode} - ${response.body}');
+        print(
+          'Refresh token failed: ${response.statusCode} - ${response.body}',
+        );
         return null;
       }
     } catch (e) {

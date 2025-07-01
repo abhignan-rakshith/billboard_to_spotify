@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
+import '../config/app_routes.dart';
 import '../services/spotify_auth_service.dart';
 import '../services/secure_storage_service.dart';
+import '../utils/error_handler.dart';
+import '../utils/connectivity_helper.dart';
 import 'billboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -44,7 +47,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<dynamic> _handleDeepLink(MethodCall call) async {
     if (call.method == 'incoming_link') {
       final String? link = call.arguments;
-      if (link != null && link.startsWith(AppConstants.spotifyRedirectUriMobile)) {
+      if (link != null &&
+          link.startsWith(AppConstants.spotifyRedirectUriMobile)) {
         await _processSpotifyCallback(link);
       }
     }
@@ -58,7 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (error != null) {
         setState(() {
-          _status = '❌ Authentication Failed!\n\nUser denied permission or cancelled login.\nPlease try again to use Spotify features.';
+          _status =
+              '❌ Authentication Failed!\n\nUser denied permission or cancelled login.\nPlease try again to use Spotify features.';
           _isLoading = false;
         });
         return;
@@ -78,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        _status = '❌ Error processing callback: $e';
+        _status = '❌ ${ErrorHandler.getReadableError(e)}';
         _isLoading = false;
       });
     }
@@ -106,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        _status = '❌ Token exchange failed: $e';
+        _status = '❌ ${ErrorHandler.getReadableError(e)}';
         _isLoading = false;
       });
     }
@@ -121,7 +126,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await SecureStorageService.saveUserProfile(profile);
 
       setState(() {
-        _status = '✅ Login Successful!\n\nWelcome, ${profile['display_name'] ?? 'Spotify User'}!';
+        _status =
+            '✅ Login Successful!\n\nWelcome, ${profile['display_name'] ?? 'Spotify User'}!';
         _isLoading = false;
       });
     } catch (e) {
@@ -148,7 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (_userProfile != null) {
           setState(() {
-            _status = '✅ Welcome back, ${_userProfile!['display_name'] ?? 'Spotify User'}!';
+            _status =
+                '✅ Welcome back, ${_userProfile!['display_name'] ?? 'Spotify User'}!';
             _isLoading = false;
           });
         } else {
@@ -207,6 +214,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loginToSpotify() async {
+    if (!await ConnectivityHelper.hasConnection()) {
+      setState(() {
+        _status = '📶 ${ConnectivityHelper.getOfflineMessage()}';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _status = 'Opening Spotify login...';
@@ -223,7 +237,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (launched) {
         setState(() {
-          _status = 'Please complete login in browser...\n\nYou will be redirected back to the app automatically.';
+          _status =
+              'Please complete login in browser...\n\nYou will be redirected back to the app automatically.';
         });
       } else {
         setState(() {
@@ -233,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        _status = '❌ Error: $e';
+        _status = '❌ ${ErrorHandler.getReadableError(e)}';
         _isLoading = false;
       });
     }
@@ -265,66 +280,11 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // App Icon
-              const Icon(
-                Icons.music_note,
-                size: AppConstants.iconSize,
-                color: ThemeConfig.spotifyGreen,
-              ),
+              _buildAppIcon(),
               const SizedBox(height: 40),
 
               // Login/Success Buttons
-              if (_accessToken == null)
-                SizedBox(
-                  width: double.infinity,
-                  height: AppConstants.buttonHeight,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _loginToSpotify,
-                    icon: _isLoading
-                        ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                        : const Icon(Icons.login),
-                    label: Text(_isLoading ? 'Opening Spotify...' : 'Login to Spotify'),
-                    style: ThemeConfig.primaryButtonStyle,
-                  ),
-                )
-              else ...[
-                // Success buttons when logged in
-                SizedBox(
-                  width: double.infinity,
-                  height: AppConstants.buttonHeight,
-                  child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const BillboardScreen(),
-                          ),
-                        );
-                      },
-                    icon: const Icon(Icons.playlist_add),
-                    label: const Text('Create Billboard Playlist'),
-                    style: ThemeConfig.secondaryButtonStyle,
-                  ),
-                ),
-                const SizedBox(height: AppConstants.defaultPadding),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: AppConstants.smallButtonHeight,
-                  child: OutlinedButton.icon(
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Logout'),
-                    style: ThemeConfig.outlinedButtonStyle,
-                  ),
-                ),
-              ],
+              _buildActionButtons(),
 
               const SizedBox(height: 40),
 
@@ -340,6 +300,74 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAppIcon() {
+    return const Icon(
+      Icons.music_note,
+      size: AppConstants.iconSize,
+      color: ThemeConfig.spotifyGreen,
+    );
+  }
+
+  Widget _buildActionButtons() {
+    if (_accessToken == null) {
+      return _buildLoginButton();
+    } else {
+      return _buildLoggedInButtons();
+    }
+  }
+
+  Widget _buildLoginButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: AppConstants.buttonHeight,
+      child: ElevatedButton.icon(
+        onPressed: _isLoading ? null : _loginToSpotify,
+        icon: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.login),
+        label: Text(_isLoading ? 'Connecting...' : 'Login to Spotify'),
+        style: ThemeConfig.primaryButtonStyle,
+      ),
+    );
+  }
+
+  Widget _buildLoggedInButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: AppConstants.buttonHeight,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.billboard);
+            },
+            icon: const Icon(Icons.playlist_add),
+            label: const Text('Create Billboard Playlist'),
+            style: ThemeConfig.secondaryButtonStyle,
+          ),
+        ),
+        const SizedBox(height: AppConstants.defaultPadding),
+        SizedBox(
+          width: double.infinity,
+          height: AppConstants.smallButtonHeight,
+          child: OutlinedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+            style: ThemeConfig.outlinedButtonStyle,
+          ),
+        ),
+      ],
     );
   }
 
@@ -377,10 +405,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Profile Image
-                  if (_userProfile!['images'] != null && _userProfile!['images'].isNotEmpty)
+                  if (_userProfile!['images'] != null &&
+                      _userProfile!['images'].isNotEmpty)
                     CircleAvatar(
                       radius: AppConstants.avatarRadius,
-                      backgroundImage: NetworkImage(_userProfile!['images'][0]['url']),
+                      backgroundImage: NetworkImage(
+                        _userProfile!['images'][0]['url'],
+                      ),
                     )
                   else
                     const CircleAvatar(
@@ -420,7 +451,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Flexible(
                         child: Text(
                           '${_userProfile!['followers']?['total'] ?? 0} followers',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -450,11 +484,31 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _debugInfoRow('Client ID', AppConstants.spotifyClientId),
-                  _debugInfoRow('Redirect (Mobile)', AppConstants.spotifyRedirectUriMobile),
-                  _debugInfoRow('Redirect (Desktop)', AppConstants.spotifyRedirectUriDesktop),
-                  _debugInfoRow('Current Platform', Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : Platform.isWindows ? 'Windows' : Platform.isMacOS ? 'macOS' : 'Other'),
+                  _debugInfoRow(
+                    'Redirect (Mobile)',
+                    AppConstants.spotifyRedirectUriMobile,
+                  ),
+                  _debugInfoRow(
+                    'Redirect (Desktop)',
+                    AppConstants.spotifyRedirectUriDesktop,
+                  ),
+                  _debugInfoRow(
+                    'Current Platform',
+                    Platform.isAndroid
+                        ? 'Android'
+                        : Platform.isIOS
+                        ? 'iOS'
+                        : Platform.isWindows
+                        ? 'Windows'
+                        : Platform.isMacOS
+                        ? 'macOS'
+                        : 'Other',
+                  ),
                   if (SpotifyAuthService.codeVerifier != null)
-                    _debugInfoRow('Code Verifier', '${SpotifyAuthService.codeVerifier!.substring(0, 20)}...'),
+                    _debugInfoRow(
+                      'Code Verifier',
+                      '${SpotifyAuthService.codeVerifier!.substring(0, 20)}...',
+                    ),
                 ],
               ),
             ),

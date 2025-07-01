@@ -63,10 +63,7 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Step 1: Playlist Name Setup
-              const Text(
-                'Playlist Name',
-                style: ThemeConfig.titleStyle,
-              ),
+              const Text('Playlist Name', style: ThemeConfig.titleStyle),
               const SizedBox(height: AppConstants.smallPadding),
               Text(
                 'We\'ll create a Spotify playlist with the following name:',
@@ -110,7 +107,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
                   decoration: BoxDecoration(
                     color: ThemeConfig.spotifyGreen.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: ThemeConfig.spotifyGreen.withOpacity(0.3)),
+                    border: Border.all(
+                      color: ThemeConfig.spotifyGreen.withOpacity(0.3),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -123,9 +122,13 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
 
                       // Progress Bar
                       LinearProgressIndicator(
-                        value: _totalSongs > 0 ? _searchProgress / _totalSongs : 0,
+                        value: _totalSongs > 0
+                            ? _searchProgress / _totalSongs
+                            : 0,
                         backgroundColor: Colors.grey[300],
-                        valueColor: const AlwaysStoppedAnimation<Color>(ThemeConfig.spotifyGreen),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          ThemeConfig.spotifyGreen,
+                        ),
                       ),
                       const SizedBox(height: AppConstants.smallPadding),
 
@@ -141,7 +144,10 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
                         child: OutlinedButton.icon(
                           onPressed: _abortSearch,
                           icon: const Icon(Icons.cancel, color: Colors.red),
-                          label: const Text('Abort Search', style: TextStyle(color: Colors.red)),
+                          label: const Text(
+                            'Abort Search',
+                            style: TextStyle(color: Colors.red),
+                          ),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Colors.red),
                           ),
@@ -159,7 +165,11 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
               ],
 
               // Add extra padding at bottom to ensure button is above keyboard
-              SizedBox(height: MediaQuery.of(context).viewInsets.bottom + AppConstants.largePadding),
+              SizedBox(
+                height:
+                    MediaQuery.of(context).viewInsets.bottom +
+                    AppConstants.largePadding,
+              ),
             ],
           ),
         ),
@@ -203,7 +213,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
       // Only update state if this search is still active
       if (mounted && _currentSearchId == searchId) {
         final foundUris = List<String>.from(searchResults['foundUris']);
-        final notFoundSongs = List<Map<String, dynamic>>.from(searchResults['notFoundSongs']);
+        final notFoundSongs = List<Map<String, dynamic>>.from(
+          searchResults['notFoundSongs'],
+        );
         final totalFound = searchResults['totalFound'];
 
         setState(() {
@@ -282,161 +294,184 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with icon
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: ThemeConfig.spotifyGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.search_rounded,
-                  color: ThemeConfig.spotifyGreen,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: AppConstants.defaultPadding),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Search Results',
-                      style: ThemeConfig.titleStyle,
-                    ),
-                    Text(
-                      'Found $_totalSongsFound out of ${widget.songs.length} songs on Spotify',
-                      style: ThemeConfig.bodyStyle.copyWith(
-                        color: Colors.grey[600],
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
+          _buildResultsHeader(),
           const SizedBox(height: AppConstants.defaultPadding),
 
           // Statistics Cards
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  'Found',
-                  _totalSongsFound.toString(),
-                  Colors.green,
-                  Icons.check_circle_rounded,
-                ),
-              ),
-              const SizedBox(width: AppConstants.smallPadding),
-              Expanded(
-                child: _buildStatCard(
-                  'Missing',
-                  _notFoundSongs.length.toString(),
-                  Colors.orange,
-                  Icons.info_rounded,
-                ),
-              ),
-            ],
-          ),
+          _buildStatisticsCards(),
 
           if (_notFoundSongs.isNotEmpty) ...[
             const SizedBox(height: AppConstants.defaultPadding),
 
             // Expandable missing songs section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        color: Colors.orange[700],
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Missing Songs (${_notFoundSongs.length})',
-                        style: ThemeConfig.bodyStyle.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange[700],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Show first 3 missing songs
-                  ..._notFoundSongs.take(3).map((songData) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 1),
-                    child: Text(
-                      '• #${songData['position']}: ${songData['song']} by ${songData['artist']}',
-                      style: ThemeConfig.bodyStyle.copyWith(
-                        fontSize: 11,
-                        color: Colors.grey[600],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  )),
-
-                  if (_notFoundSongs.length > 3)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '... and ${_notFoundSongs.length - 3} more',
-                        style: ThemeConfig.subtitleStyle.copyWith(
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            _buildMissingSongsSection(),
           ],
 
           const SizedBox(height: AppConstants.largePadding),
 
           // Create Playlist Button with improved design
-          Container(
-            width: double.infinity,
-            height: AppConstants.buttonHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  ThemeConfig.spotifyGreen,
-                  ThemeConfig.spotifyGreen.withOpacity(0.8),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: ThemeConfig.spotifyGreen.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+          _buildCreatePlaylistButton(),
+
+          const SizedBox(height: AppConstants.smallPadding),
+
+          // Description text
+          _buildPlaylistDescription(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultsHeader() {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: ThemeConfig.spotifyGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.search_rounded,
+            color: ThemeConfig.spotifyGreen,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: AppConstants.defaultPadding),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Search Results', style: ThemeConfig.titleStyle),
+              Text(
+                'Found $_totalSongsFound out of ${widget.songs.length} songs on Spotify',
+                style: ThemeConfig.bodyStyle.copyWith(
+                  color: Colors.grey[600],
+                  fontSize: 13,
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatisticsCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            'Found',
+            _totalSongsFound.toString(),
+            Colors.green,
+            Icons.check_circle_rounded,
+          ),
+        ),
+        const SizedBox(width: AppConstants.smallPadding),
+        Expanded(
+          child: _buildStatCard(
+            'Missing',
+            _notFoundSongs.length.toString(),
+            Colors.orange,
+            Icons.info_rounded,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMissingSongsSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                color: Colors.orange[700],
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Missing Songs (${_notFoundSongs.length})',
+                style: ThemeConfig.bodyStyle.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange[700],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Show first 3 missing songs
+          ..._notFoundSongs
+              .take(AppConstants.maxDisplayedMissingSongs)
+              .map(
+                (songData) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: Text(
+                    '• #${songData['position']}: ${songData['song']} by ${songData['artist']}',
+                    style: ThemeConfig.bodyStyle.copyWith(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+
+          if (_notFoundSongs.length > AppConstants.maxDisplayedMissingSongs)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '... and ${_notFoundSongs.length - AppConstants.maxDisplayedMissingSongs} more',
+                style: ThemeConfig.subtitleStyle.copyWith(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
             ),
-            child: ElevatedButton.icon(
-              onPressed: _isCreatingPlaylist ? null : _createPlaylistOnSpotify,
-              icon: _isCreatingPlaylist
-                  ? const SizedBox(
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreatePlaylistButton() {
+    return Container(
+      width: double.infinity,
+      height: AppConstants.buttonHeight,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            ThemeConfig.spotifyGreen,
+            ThemeConfig.spotifyGreen.withOpacity(0.8),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ThemeConfig.spotifyGreen.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton.icon(
+        onPressed: _isCreatingPlaylist ? null : _createPlaylistOnSpotify,
+        icon: _isCreatingPlaylist
+            ? const SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
@@ -444,67 +479,65 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
                   color: Colors.white,
                 ),
               )
-                  : const Icon(
-                Icons.playlist_add_rounded,
-                color: Colors.white,
-              ),
-              label: Text(
-                _isCreatingPlaylist ? 'Creating Playlist...' : 'Create Playlist on Spotify',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
-              ),
-            ),
+            : const Icon(Icons.playlist_add_rounded, color: Colors.white),
+        label: Text(
+          _isCreatingPlaylist
+              ? 'Creating Playlist...'
+              : 'Create Playlist on Spotify',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
           ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+        ),
+      ),
+    );
+  }
 
-          const SizedBox(height: AppConstants.smallPadding),
-
-          // Description text
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
+  Widget _buildPlaylistDescription() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Playlist: "${_playlistNameController.text}"',
+            style: ThemeConfig.bodyStyle.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
             ),
-            child: Column(
-              children: [
-                Text(
-                  'Playlist: "${_playlistNameController.text}"',
-                  style: ThemeConfig.bodyStyle.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Will add $_totalSongsFound songs • ${widget.selectedDate}',
-                  style: ThemeConfig.subtitleStyle.copyWith(
-                    fontSize: 11,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Will add $_totalSongsFound songs • ${widget.selectedDate}',
+            style: ThemeConfig.subtitleStyle.copyWith(fontSize: 11),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color, IconData icon) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -514,25 +547,13 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 20,
-          ),
+          Icon(icon, color: color, size: 20),
           const SizedBox(height: 4),
           Text(
             value,
-            style: ThemeConfig.titleStyle.copyWith(
-              color: color,
-              fontSize: 18,
-            ),
+            style: ThemeConfig.titleStyle.copyWith(color: color, fontSize: 18),
           ),
-          Text(
-            label,
-            style: ThemeConfig.subtitleStyle.copyWith(
-              fontSize: 11,
-            ),
-          ),
+          Text(label, style: ThemeConfig.subtitleStyle.copyWith(fontSize: 11)),
         ],
       ),
     );
@@ -555,7 +576,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
 
     try {
       // Step 1: Check if playlist already exists
-      final playlistExists = await SpotifyPlaylistService.playlistExists(_playlistNameController.text);
+      final playlistExists = await SpotifyPlaylistService.playlistExists(
+        _playlistNameController.text,
+      );
 
       if (playlistExists) {
         if (mounted) {
@@ -565,7 +588,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('❌ A playlist named "${_playlistNameController.text}" already exists'),
+              content: Text(
+                '❌ A playlist named "${_playlistNameController.text}" already exists',
+              ),
               backgroundColor: ThemeConfig.errorRed,
             ),
           );
@@ -595,7 +620,9 @@ class _PlaylistCreationScreenState extends State<PlaylistCreationScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('🎉 Successfully created playlist "${_playlistNameController.text}" with $_totalSongsFound songs!'),
+              content: Text(
+                '🎉 Successfully created playlist "${_playlistNameController.text}" with $_totalSongsFound songs!',
+              ),
               backgroundColor: ThemeConfig.successGreen,
               duration: const Duration(seconds: 4),
             ),
