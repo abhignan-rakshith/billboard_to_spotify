@@ -7,7 +7,6 @@ import '../config/app_routes.dart';
 import '../services/billboard_scraper.dart';
 import '../utils/error_handler.dart';
 import '../utils/connectivity_helper.dart';
-import 'results_screen.dart';
 
 class BillboardScreen extends StatefulWidget {
   const BillboardScreen({super.key});

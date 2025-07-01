@@ -52,6 +52,10 @@ class AppConstants {
   static const int maxRetries = 3;
   static const int retryBaseDelayMs = 1000;
   static const int rateLimitDelaySeconds = 2;
+  static const int searchTimeoutSeconds =
+      15; // Shorter timeout for search requests
+  static const int playlistTimeoutSeconds =
+      45; // Longer timeout for playlist operations
 
   // UI Limits
   static const int maxDisplayedMissingSongs = 3;

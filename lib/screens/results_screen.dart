@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../config/theme_config.dart';
 import '../config/app_routes.dart';
-import 'playlist_creation_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
   final String selectedDate;
